@@ -1,0 +1,123 @@
+(* Server sub-process *)
+let server(c1:channel,c2:channel,c3:channel)=
+	(* Server initialization (Public Keys and Signatures) *)
+	new labyrinthID: bitstring;
+	(* client uploads to the server *)
+	in(c1,(deviceKeyPub:pub_key_sig,epochStorageKeyPub:pub_key_enc,epochStorageKeySig:signature,epochStorageAuthKeyPub:pub_key_auth,epochStorageAuthKeySig:signature));
+	let orfServerState_1 = orf_server_init() in
+	(
+		(!      
+			in(c1,encryptedMessage:bitstring);
+			insert epoch1(encryptedMessage)
+		)
+		|
+		(!
+			get epoch1(encryptedMessage) in
+			out(c1,encryptedMessage)
+		)
+	)
+	|
+	(
+		(* **********Adding a Device********** *)
+		(* Virtual Devices *)
+		in(c1,(encryptedDeviceKeyPriv_1:bitstring,encryptedEpochStorageKeyPriv_1:bitstring,encryptedOrfClientState_1:bitstring,encryptedMailboxRootSalt_1:bitstring,encryptedEpochRootKey_1:bitstring,encryptedEpochSequenceID_1:bitstring,
+			deviceKeyPub_v_1:pub_key_sig,epochStorageKeyPub_v_1:pub_key_enc,
+			vdeviceId_1:bitstring,
+			epochStorageKeySig_v_1:signature,
+			evolveToken_v_1:coins,
+			epochDeviceMac_v_1:bitstring));
+		let vdeviceOrfServerState_1 = orf_server_evolve(evolveToken_v_1,orfServerState_1) in
+		(* Adding a new device *)
+		out(c2,(encryptedDeviceKeyPriv_1,encryptedEpochStorageKeyPriv_1,encryptedOrfClientState_1,encryptedMailboxRootSalt_1,encryptedEpochRootKey_1,encryptedEpochSequenceID_1,
+			deviceKeyPub_v_1,epochStorageKeyPub_v_1,
+			epochStorageKeySig_v_1,
+			epochDeviceMac_v_1));
+		(* The public keys, signatures, evolveToken and epochDeviceMac are registered to the server *)
+		in(c2,(deviceKeyPub_2:pub_key_sig,epochStorageKeyPub_2:pub_key_enc,epochStorageAuthKeyPub_2:pub_key_auth,
+			epochStorageKeySig_2:signature,epochStorageAuthKeySig_2:signature,
+			evolveToken_2:coins,epochDeviceMac_2:bitstring));    
+		let orfServerState_2 = orf_server_evolve(evolveToken_2,vdeviceOrfServerState_1) in
+		(
+			(!
+				in(c2,encryptedMessage:bitstring);
+				insert epoch1(encryptedMessage)
+			)
+			|
+			(!
+				get epoch1(encryptedMessage) in
+				out(c2,encryptedMessage)
+			)
+		)
+		|
+		(
+			(* **********Adding a Device********** *)
+			(* Virtual Devices *)
+			in(c2,(encryptedDeviceKeyPriv_2:bitstring,encryptedEpochStorageKeyPriv_2:bitstring,encryptedOrfClientState_2:bitstring,encryptedMailboxRootSalt_2:bitstring,encryptedEpochRootKey_2:bitstring,encryptedEpochSequenceID_2:bitstring,
+				deviceKeyPub_v_2:pub_key_sig,epochStorageKeyPub_v_2:pub_key_enc,
+				vdeviceId_2:bitstring,
+				epochStorageKeySig_v_2:signature,
+				evolveToken_v_2:coins,
+				epochDeviceMac_v_2:bitstring));
+			let vdeviceOrfServerState_2 = orf_server_evolve(evolveToken_v_2,orfServerState_2) in
+			(* Adding a new device *)
+			out(c3,(encryptedDeviceKeyPriv_2,encryptedEpochStorageKeyPriv_2,encryptedOrfClientState_2,encryptedMailboxRootSalt_2,encryptedEpochRootKey_2,encryptedEpochSequenceID_2,
+				deviceKeyPub_v_2,epochStorageKeyPub_v_2,
+				epochStorageKeySig_v_2,
+				epochDeviceMac_v_2));
+			(* The public keys, signatures, evolveToken and epochDeviceMac are registered to the server *)
+			in(c3,(deviceKeyPub_3:pub_key_sig,epochStorageKeyPub_3:pub_key_enc,epochStorageAuthKeyPub_3:pub_key_auth,
+				epochStorageKeySig_3:signature,epochStorageAuthKeySig_3:signature,
+				evolveToken_3:coins,epochDeviceMac_3:bitstring));
+			(
+				(!
+					in(c3,encryptedMessage:bitstring);
+					insert epoch1(encryptedMessage)
+				)
+				|
+				(!
+					get epoch1(encryptedMessage) in
+					out(c3,encryptedMessage)
+				)
+			)
+		)
+		|
+		(
+			phase 1;
+			(* Client3 revokes *)
+			(* **********3rd Epoch********** *)
+			in(c1,(encryptedPreviousEpochSequenceID:bitstring,encryptedPreviousEpochRootKey:bitstring));
+			out(c1,(deviceKeyPub_2,epochStorageKeySig_2,epochStorageKeyPub_2,epochDeviceMac_2));
+			in(c1,epochEntropyEncrypted:bitstring);
+			out(c2,epochEntropyEncrypted);
+			out(c2,(deviceKeyPub,epochStorageAuthKeySig,epochStorageAuthKeyPub));
+			(!
+				in(c1,encryptedMessage:bitstring);
+				insert epoch2(encryptedMessage)
+			)
+			|
+			(!
+				get epoch1(encryptedMessage) in
+				out(c1,encryptedMessage)
+			)
+			|
+			(!
+				get epoch2(encryptedMessage) in
+				out(c1,encryptedMessage)
+			)
+			|
+			(!
+				in(c2,encryptedMessage:bitstring);
+				insert epoch2(encryptedMessage)
+			)
+			|
+			(!
+				get epoch1(encryptedMessage) in
+				out(c2,encryptedMessage)
+			)
+			|
+			(!
+				get epoch2(encryptedMessage) in
+				out(c2,encryptedMessage)
+			)
+		)
+	).

@@ -1,0 +1,18 @@
+(* Channel *)
+free c: channel. (* For attacker *)
+free c1: channel.
+free c2: channel.
+
+(* Secrecy *)
+query secret message.
+query secret message_2.
+
+(* Integrity *)
+query m:bitstring; event(load_message_1_c1(m)) ==> (event(save_message_1_c1(m)) || event(save_message_1_c2(m))).
+query m:bitstring; event(load_message_1_c2(m)) ==> (event(save_message_1_c1(m)) || event(save_message_1_c2(m))).
+
+query m:bitstring; event(load_message_2_c1(m)) ==> event(save_message_2_c1(m)).
+
+(* main *)
+process
+    (!client_1(c,c1,c2)|!server(c1,c2))

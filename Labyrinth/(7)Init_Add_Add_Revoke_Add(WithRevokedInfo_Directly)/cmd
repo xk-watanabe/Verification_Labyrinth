@@ -1,0 +1,2 @@
+#!/bin/sh
+proverif -lib decl.pvl -lib client_4.pvl -lib client_3.pvl -lib client_2.pvl -lib client_1.pvl -lib server.pvl -graph . main.pv

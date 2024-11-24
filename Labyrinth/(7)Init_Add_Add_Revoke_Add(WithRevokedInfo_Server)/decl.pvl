@@ -1,0 +1,174 @@
+(* Ideal AEAD *)
+type key.
+type nonce.
+fun enc_cipher(key,nonce,bitstring,bitstring): bitstring.
+reduc forall k:key,n:nonce,aad,plaintext:bitstring;
+    dec_cipher(k,n,aad,enc_cipher(k,n,aad,plaintext)) = plaintext.
+fun enc_tag(key,nonce,bitstring,bitstring): bitstring.
+letfun encrypt(k:key,n:nonce,aad:bitstring,plaintext:bitstring)=
+    (enc_cipher(k,n,aad,plaintext),enc_tag(k,n,aad,plaintext)).
+letfun decrypt(k:key,n:nonce,aad:bitstring,ciphertext':bitstring)=
+    let (ciphertext:bitstring,tag:bitstring) = ciphertext' in
+    let plaintext' = dec_cipher(k,n,aad,ciphertext) in
+    if tag = enc_tag(k,n,aad,plaintext') then
+    plaintext'.
+
+(* Ideal AEAD (Key) *)
+fun enc_cipher_key(key,nonce,bitstring,key): bitstring.
+reduc forall k,plaintext:key,n:nonce,aad:bitstring;
+    dec_cipher_key(k,n,aad,enc_cipher_key(k,n,aad,plaintext)) = plaintext.
+fun enc_tag_key(key,nonce,bitstring,key): bitstring.
+letfun encrypt_key(k:key,n:nonce,aad:bitstring,plaintext:key)=
+    (enc_cipher_key(k,n,aad,plaintext),enc_tag_key(k,n,aad,plaintext)).
+letfun decrypt_key(k:key,n:nonce,aad:bitstring,ciphertext':bitstring)=
+    let (ciphertext:bitstring,tag:bitstring) = ciphertext' in
+    let plaintext' = dec_cipher_key(k,n,aad,ciphertext) in
+    if tag = enc_tag_key(k,n,aad,plaintext') then
+    plaintext'.
+
+(* DB *)
+table epoch1(bitstring).
+table epoch2(bitstring).
+
+(* HPKE *)
+type priv_key_enc.
+type pub_key_enc.
+fun pub_enc_gen(priv_key_enc): pub_key_enc.
+
+type priv_key_auth.
+type pub_key_auth.
+fun pub_auth_gen(priv_key_auth): pub_key_auth.
+
+letfun pk_enc_keygen()=
+    new pv_key_enc: priv_key_enc;
+    let pb_key_enc = pub_enc_gen(pv_key_enc) in
+    (pv_key_enc,pb_key_enc).
+
+letfun pk_auth_keygen()=
+    new pv_key_auth: priv_key_auth;
+    let pb_key_auth = pub_auth_gen(pv_key_auth) in
+    (pv_key_auth,pb_key_auth).
+
+fun pk_encrypt(pub_key_enc,pub_key_auth,priv_key_auth,bitstring,bitstring,bitstring): bitstring.
+reduc forall pv_key_enc:priv_key_enc,pv_key_auth:priv_key_auth,pre_shared_key,aad,plaintext:bitstring;
+    pk_decrypt(pub_enc_gen(pv_key_enc),pv_key_enc,pub_auth_gen(pv_key_auth),pre_shared_key,aad,
+        pk_encrypt(pub_enc_gen(pv_key_enc),pub_auth_gen(pv_key_auth),pv_key_auth,pre_shared_key,aad,plaintext)) = plaintext.
+
+(* Signature *)
+type priv_key_sig.
+type pub_key_sig.
+fun gen_pub_sig(priv_key_sig): pub_key_sig.
+
+letfun pk_sig_keygen()=
+    new pv_key_sig: priv_key_sig;
+    let pb_key_sig = gen_pub_sig(pv_key_sig) in
+    (pv_key_sig,pb_key_sig).
+
+type signature.
+type use_case_byte.
+fun pk_sign_enc(priv_key_sig,use_case_byte,pub_key_enc): signature.
+fun pk_sign_auth(priv_key_sig,use_case_byte,pub_key_auth): signature.
+reduc forall pv_key_sig:priv_key_sig,bytes:use_case_byte,data:pub_key_enc;
+    pk_verify_enc(gen_pub_sig(pv_key_sig),pk_sign_enc(pv_key_sig,bytes,data),bytes,data) = true.
+reduc forall pv_key_sig:priv_key_sig,bytes:use_case_byte,data:pub_key_auth;
+    pk_verify_auth(gen_pub_sig(pv_key_sig),pk_sign_auth(pv_key_sig,bytes,data),bytes,data) = true.
+
+(* MAC *)
+type MAC.
+fun mac(bitstring,pub_key_sig): bitstring.
+
+(* Key Derivation *)
+fun kdf_two_first(key,bitstring,bitstring): bitstring.
+fun kdf_two_second(key,bitstring,bitstring): bitstring.
+letfun kdf(a:key,b:bitstring,c:bitstring)=
+    let x = kdf_two_first(a,b,c) in
+    let y = kdf_two_second(a,b,c) in
+    (x,y).
+
+(* Concat *)
+fun concat(bitstring): bitstring.
+
+(* ORF *)
+type coins.
+fun mult_coins(coins,coins): coins.
+fun div_coins(coins,coins): coins.
+letfun orf_cilent_init()=
+    new cilent_state: coins;
+    cilent_state.
+letfun orf_server_init()=
+    new server_state: coins;
+    server_state.
+letfun orf_client_evolve(x:coins)=
+    new rotation_token: coins;
+    let new_client_state = mult_coins(x,rotation_token) in
+    (new_client_state,rotation_token).
+letfun orf_server_evolve(x:coins,y:coins)=
+    let new_server_state = div_coins(x,y) in
+    new_server_state.
+
+(* NAT *)
+reduc forall x:nat; nat_init(x) = x.
+
+(* Base64 Encoding *)
+fun base64_encode(nat): bitstring.
+reduc forall x:nat; base64_decode(base64_encode(x)) = x.
+
+(* Constant data *)
+const null: bitstring.
+const epoch_data_storage_: bitstring.
+const epoch_devices_: bitstring.
+const message_key_in_epoch_: bitstring.
+const cipher_version_3_thread_: bitstring.
+const message_thread_: bitstring.
+const epoch_chaining_: bitstring.
+const epoch_root_key: bitstring.
+const epoch__: bitstring.
+const under_score: bitstring. (* '_' *)
+const epoch_data_metadata: bitstring.
+const BackupRecoveryCode_v: bitstring.
+const virtual_device_colon_virtual_device_private_key: bitstring.
+const virtual_device_colon_epoch_storage_private_key: bitstring.
+const virtual_device_colon_ocmf_client_state: bitstring.
+const virtual_device_colon_mailbox_root_key: bitstring.
+const virtual_device_colon_epoch_root_key: bitstring.
+const virtual_device_colon_epoch_anon_id: bitstring.
+const b_0x30: use_case_byte.
+const b_0x31: use_case_byte.
+
+(* For Generating Recovery Codes *)
+free version: bitstring.
+free identifier: bitstring.
+fun errorCorrection(bitstring): bitstring.
+
+(* epochID *)
+free epochID: bitstring.
+
+(* freedata *)
+free user_id: bitstring.
+free threadId: bitstring.
+
+(* Type Converter *)
+fun convertKey(bitstring): key[typeConverter].
+reduc forall x:bitstring; Key_to_bitstring(convertKey(x)) = x.
+fun nat_to_bitstring(nat): bitstring[typeConverter].
+reduc forall x:nat; bitstring_to_nat(nat_to_bitstring(x)) = x.
+fun priv_key_sig_to_bitstring(priv_key_sig): bitstring[typeConverter].
+fun priv_key_enc_to_bitstring(priv_key_enc): bitstring[typeConverter].
+fun coins_to_bitstring(coins): bitstring[typeConverter].
+reduc forall x:coins; bitstring_to_coins(coins_to_bitstring(x)) = x.
+
+(* Events *)
+event save_message_1_c1(bitstring).
+event save_message_1_c2(bitstring).
+event save_message_1_c3(bitstring).
+event load_message_1_c1(bitstring).
+event load_message_1_c2(bitstring).
+event load_message_1_c3(bitstring).
+event load_message_1_c4(bitstring).
+
+event save_message_2_c1(bitstring).
+event save_message_2_c2(bitstring).
+event save_message_2_c4(bitstring).
+event load_message_2_c1(bitstring).
+event load_message_2_c2(bitstring).
+event load_message_2_c4(bitstring).

@@ -1,0 +1,109 @@
+(* Server sub-process *)
+let server(c1:channel,c2:channel,c3:channel)=
+	(* Server initialization (Public Keys and Signatures) *)
+	new labyrinthID: bitstring;
+	(* client uploads to the server *)
+	in(c1,(deviceKeyPub:pub_key_sig,epochStorageKeyPub:pub_key_enc,epochStorageKeySig:signature,epochStorageAuthKeyPub:pub_key_auth,epochStorageAuthKeySig:signature));
+	let orfServerState = orf_server_init() in
+	(!      
+		in(c1,encryptedMessage:bitstring);
+		insert epoch1(encryptedMessage)
+	)
+	|
+	(!
+		get epoch1(encryptedMessage) in
+		out(c1,encryptedMessage)
+	)
+	|
+	(
+		(* **********Adding a Device********** *)
+		(* Virtual Devices *)
+		in(c1,(encryptedDeviceKeyPriv:bitstring,encryptedEpochStorageKeyPriv:bitstring,encryptedOrfClientState:bitstring,encryptedMailboxRootSalt:bitstring,encryptedEpochRootKey:bitstring,encryptedEpochSequenceID:bitstring,
+			deviceKeyPub_v:pub_key_sig,epochStorageKeyPub_v:pub_key_enc,
+			vdeviceId:bitstring,
+			epochStorageKeySig_v:signature,
+			evolveToken:coins,
+			epochDeviceMac_v:bitstring));
+		let vdeviceOrfServerState = orf_server_evolve(evolveToken,orfServerState) in
+		(* Adding a new device *)
+		out(c2,(encryptedDeviceKeyPriv,encryptedEpochStorageKeyPriv,encryptedOrfClientState,encryptedMailboxRootSalt,encryptedEpochRootKey,encryptedEpochSequenceID,
+			deviceKeyPub_v,epochStorageKeyPub_v,
+			epochStorageKeySig_v,
+			epochDeviceMac_v));
+		(* The public keys, signatures, evolveToken and epochDeviceMac are registered to the server *)
+		in(c2,(deviceKeyPub_2:pub_key_sig,epochStorageKeyPub_2:pub_key_enc,epochStorageAuthKeyPub_2:pub_key_auth,
+			epochStorageKeySig_2:signature,epochStorageAuthKeySig_2:signature,
+			evolveToken_2:coins,epochDeviceMac_2:bitstring));    
+		let orfServerState_2 = orf_server_evolve(evolveToken_2,vdeviceOrfServerState) in
+		(
+			(!
+				in(c2,encryptedMessage:bitstring);
+				insert epoch1(encryptedMessage)
+			)
+			|
+			(!
+				get epoch1(encryptedMessage) in
+				out(c2,encryptedMessage)
+			)
+		)
+	)
+	|
+	(
+		phase 1;
+		(* **********2nd Epoch********** *)
+		in(c1,(encryptedPreviousEpochSequenceID:bitstring,encryptedPreviousEpochRootKey:bitstring));
+		(!
+			in(c1,encryptedMessage:bitstring);
+			insert epoch2(encryptedMessage)
+		)
+		|
+		(!
+			get epoch1(encryptedMessage) in
+			out(c1,encryptedMessage)
+		)
+		|
+		(!
+			get epoch2(encryptedMessage) in
+			out(c1,encryptedMessage)
+		)
+		|
+		(
+			(* **********Adding a Device********** *)
+			(* Virtual Devices *)
+			in(c1,(encryptedDeviceKeyPriv':bitstring,encryptedEpochStorageKeyPriv':bitstring,encryptedOrfClientState':bitstring,encryptedMailboxRootSalt':bitstring,encryptedEpochRootKey':bitstring,encryptedEpochSequenceID':bitstring,
+				deviceKeyPub_v':pub_key_sig,epochStorageKeyPub_v':pub_key_enc,
+				vdeviceId':bitstring,
+				epochStorageKeySig_v':signature,
+				evolveToken':coins,
+				epochDeviceMac_v':bitstring));
+			let vdeviceOrfServerState' = orf_server_evolve(evolveToken',orfServerState) in
+			(* Adding a new device *)
+			out(c3,(encryptedDeviceKeyPriv',encryptedEpochStorageKeyPriv',encryptedOrfClientState',encryptedMailboxRootSalt',encryptedEpochRootKey',encryptedEpochSequenceID',
+				deviceKeyPub_v',epochStorageKeyPub_v',
+				epochStorageKeySig_v',
+				epochDeviceMac_v'));
+			(* The public keys, signatures, evolveToken and epochDeviceMac are registered to the server *)
+			in(c3,(deviceKeyPub_3:pub_key_sig,epochStorageKeyPub_3:pub_key_enc,epochStorageAuthKeyPub_3:pub_key_auth,
+				epochStorageKeySig_3:signature,epochStorageAuthKeySig_3:signature,
+				evolveToken_3:coins,epochDeviceMac_3:bitstring));    
+			let orfServerState_3 = orf_server_evolve(evolveToken_3,vdeviceOrfServerState') in
+			(* Publish encrypted values for client_3 *)
+			out(c3,(encryptedPreviousEpochSequenceID,encryptedPreviousEpochRootKey));
+			(
+				(!
+					in(c3,encryptedMessage:bitstring);
+					insert epoch2(encryptedMessage)
+				)
+				|
+				(!
+					get epoch1(encryptedMessage) in
+					out(c3,encryptedMessage)
+				)
+				|
+				(!
+					get epoch2(encryptedMessage) in
+					out(c3,encryptedMessage)
+				)
+			)
+		)
+	).

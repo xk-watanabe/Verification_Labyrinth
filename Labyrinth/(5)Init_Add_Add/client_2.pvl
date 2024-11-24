@@ -1,0 +1,84 @@
+(* Client2 sub-process *)
+let client_2(c2:channel,c3:channel,recoveryCodes_self:bitstring)=
+    (* Client secret generation *)
+    let (deviceKeyPriv:priv_key_sig,deviceKeyPub:pub_key_sig) = pk_sig_keygen() in
+    let (epochStorageKeyPriv:priv_key_enc,epochStorageKeyPub:pub_key_enc) = pk_enc_keygen() in
+    let epochStorageKeySig = pk_sign_enc(deviceKeyPriv,b_0x30,epochStorageKeyPub) in
+    let (epochStorageAuthKeyPriv:priv_key_auth,epochStorageAuthKeyPub:pub_key_auth) = pk_auth_keygen() in
+    let epochStorageAuthKeySig = pk_sign_auth(deviceKeyPriv,b_0x31,epochStorageAuthKeyPub) in
+    (* Parse the recovery code *)
+    let (=version,=identifier,entropy_self:bitstring,errorCorrectionCodes:bitstring) = recoveryCodes_self in
+    let (vdeviceId:bitstring,vdeviceDecryptionKey:bitstring) = kdf(convertKey(entropy_self),null,concat((BackupRecoveryCode_v,version,under_score,identifier,under_score,user_id))) in
+    (* Fetch all of the virtual device's values from server *)
+    in(c2,(encryptedDeviceKeyPriv_v_1:bitstring,encryptedEpochStorageKeyPriv_v_1:bitstring,encryptedOrfClientState_v_1:bitstring,encryptedMailboxRootSalt_v_1:bitstring,encryptedEpochRootKey_v_1:bitstring,encryptedEpochSequenceID_v_1:bitstring,
+            deviceKeyPub_v_1:pub_key_sig,epochStorageKeyPub_v_1:pub_key_enc,
+            epochStorageKeySig_v_1:signature,
+            epochDeviceMac_v_1:bitstring));
+    let (n0:nonce,encryptedOrfClientState_v_1':bitstring) = encryptedOrfClientState_v_1 in
+    let vdeviceClientState = decrypt(convertKey(vdeviceDecryptionKey),n0,virtual_device_colon_ocmf_client_state,encryptedOrfClientState_v_1') in
+    let (n1:nonce,encryptedEpochRootKey_v_1':bitstring) = encryptedEpochRootKey_v_1 in
+    let epochRootKey = decrypt(convertKey(vdeviceDecryptionKey),n1,virtual_device_colon_epoch_root_key,encryptedEpochRootKey_v_1') in
+    let (n2:nonce,encryptedEpochSequenceID_v_1':bitstring) = encryptedEpochSequenceID_v_1 in
+    let epochSequenceID = base64_decode(decrypt(convertKey(vdeviceDecryptionKey),n2,virtual_device_colon_epoch_anon_id,encryptedEpochSequenceID_v_1')) in
+    let (n3:nonce,encryptedMailboxRootSalt_v_1':bitstring) = encryptedMailboxRootSalt_v_1 in
+	let mailboxRootSalt = bitstring_to_coins(decrypt(convertKey(vdeviceDecryptionKey),n3,virtual_device_colon_mailbox_root_key,encryptedMailboxRootSalt_v_1')) in
+    (* Enrolling *)
+    let epochDeviceMacKey = kdf(convertKey(epochRootKey),null,concat((epoch_devices_,base64_encode(epochSequenceID)))) in
+    let (clientState:coins,evolveToken:coins) = orf_client_evolve(bitstring_to_coins(vdeviceClientState)) in
+    let epochDeviceMac = mac(epochDeviceMacKey,deviceKeyPub) in
+    (* The public keys, signatures, evolveToken and epochDeviceMac are registered to the server *)
+    out(c2,(deviceKeyPub,epochStorageKeyPub,epochStorageAuthKeyPub,
+            epochStorageKeySig,epochStorageAuthKeySig,
+            evolveToken,epochDeviceMac));
+    let epochDataStorageKey = kdf(convertKey(epochRootKey),null,concat((epoch_data_storage_,base64_encode(epochSequenceID)))) in
+    (* Derive a message key (1st Epoch) *)
+    let messageKey = kdf(convertKey(epochRootKey),null,concat((message_key_in_epoch_,epochSequenceID,cipher_version_3_thread_,threadId))) in
+    (* Parallel: Save and Load *)
+    (!
+        (* Load a message (1st epoch) *)
+        in(c2,encryptedMessage:bitstring);
+        let (n4:nonce,ciphertext:bitstring) = encryptedMessage in
+        let message' = decrypt(convertKey(messageKey),n4,(concat((message_thread_,threadId))),ciphertext) in
+        event load_message_1_c2(message')
+    )
+    |
+    (!
+        (* Save a message (1st epoch) *)
+        new message: bitstring;
+        new n4: nonce;
+        event save_message_1_c2(message);
+        out(c2,(n4,encrypt(convertKey(messageKey),n4,concat((message_thread_,threadId)),message)))
+    )
+	|
+	(
+		(* **********Adding a Device********** *)
+        (* Generate Recovery Codes *)
+        new entropy: bitstring;
+        let recoveryCodes = (version,identifier,entropy,errorCorrection(entropy)) in
+        let (vdeviceId_self:bitstring,vdeviceDecryptionKey_self:bitstring) = kdf(convertKey(entropy),null,concat((BackupRecoveryCode_v,version,under_score,identifier,under_score,user_id))) in
+		(* Virtual Devices *)
+        let (deviceKeyPriv_v:priv_key_sig,deviceKeyPub_v:pub_key_sig) = pk_sig_keygen() in
+        let (epochStorageKeyPriv_v:priv_key_enc,epochStorageKeyPub_v:pub_key_enc) = pk_enc_keygen() in
+        let epochStorageKeySig_v = pk_sign_enc(deviceKeyPriv_v,b_0x30,epochStorageKeyPub_v) in
+        let (vdeviceClientState_v:coins,evolveToken_v:coins) = orf_client_evolve(clientState) in
+        new n4: nonce;
+        let encryptedDeviceKeyPriv = (n4,encrypt(convertKey(vdeviceDecryptionKey_self),n4,virtual_device_colon_virtual_device_private_key,priv_key_sig_to_bitstring(deviceKeyPriv_v))) in
+        new n5: nonce;
+        let encryptedEpochStorageKeyPriv = (n5,encrypt(convertKey(vdeviceDecryptionKey_self),n5,virtual_device_colon_epoch_storage_private_key,priv_key_enc_to_bitstring(epochStorageKeyPriv_v))) in
+        new n6: nonce;
+        let encryptedOrfClientState = (n6,encrypt(convertKey(vdeviceDecryptionKey_self),n6,virtual_device_colon_ocmf_client_state,coins_to_bitstring(vdeviceClientState_v))) in
+        new n7: nonce;
+        let encryptedMailboxRootSalt = (n7,encrypt(convertKey(vdeviceDecryptionKey_self),n7,virtual_device_colon_mailbox_root_key,coins_to_bitstring(mailboxRootSalt))) in
+        new n8: nonce;
+        let encryptedEpochRootKey = (n8,encrypt(convertKey(vdeviceDecryptionKey_self),n8,virtual_device_colon_epoch_root_key,epochRootKey)) in
+        new n9: nonce;
+        let encryptedEpochSequenceID = (n9,encrypt(convertKey(vdeviceDecryptionKey_self),n9,virtual_device_colon_epoch_anon_id,base64_encode(epochSequenceID))) in
+        let epochDeviceMac_v = mac(epochDeviceMacKey,deviceKeyPub_v) in
+		out(c2,(encryptedDeviceKeyPriv,encryptedEpochStorageKeyPriv,encryptedOrfClientState,encryptedMailboxRootSalt,encryptedEpochRootKey,encryptedEpochSequenceID,
+            deviceKeyPub_v,epochStorageKeyPub_v,
+            vdeviceId_self,
+            epochStorageKeySig_v,
+            evolveToken,
+            epochDeviceMac_v));
+		client_3(c3,recoveryCodes)
+	).

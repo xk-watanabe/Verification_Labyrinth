@@ -1,0 +1,24 @@
+(* Channel *)
+free c: channel. (* For attacker *)
+free c1: channel.
+free c2: channel.
+free c3: channel.
+free c4: channel.
+
+(* Secrecy *)
+query secret message.
+query secret message_2.
+
+(* Integrity *)
+query m:bitstring; event(load_message_1_c1(m)) ==> (event(save_message_1_c1(m)) || event(save_message_1_c2(m)) || event(save_message_1_c3(m))).
+query m:bitstring; event(load_message_1_c2(m)) ==> (event(save_message_1_c1(m)) || event(save_message_1_c2(m)) || event(save_message_1_c3(m))).
+query m:bitstring; event(load_message_1_c3(m)) ==> (event(save_message_1_c1(m)) || event(save_message_1_c2(m)) || event(save_message_1_c3(m))).
+query m:bitstring; event(load_message_1_c4(m)) ==> (event(save_message_1_c1(m)) || event(save_message_1_c2(m)) || event(save_message_1_c3(m))).
+
+query m:bitstring; event(load_message_2_c1(m)) ==> (event(save_message_2_c1(m)) || event(save_message_2_c2(m)) || event(save_message_2_c4(m))).
+query m:bitstring; event(load_message_2_c2(m)) ==> (event(save_message_2_c1(m)) || event(save_message_2_c2(m)) || event(save_message_2_c4(m))).
+query m:bitstring; event(load_message_2_c4(m)) ==> (event(save_message_2_c1(m)) || event(save_message_2_c2(m)) || event(save_message_2_c4(m))).
+
+(* main *)
+process
+    (!client_1(c,c1,c2,c3,c4)|!server(c1,c2,c3,c4))
