@@ -6,7 +6,7 @@ free c3: channel.
 (* Secrecy *)
 query secret message.
 
-(* Query *)
+(* Integrity *)
 query m:bitstring; event(load_message_1_c1(m)) ==> (event(save_message_1_c1(m)) || event(save_message_1_c2(m)) || event(save_message_1_c3(m))).
 query m:bitstring; event(load_message_1_c2(m)) ==> (event(save_message_1_c1(m)) || event(save_message_1_c2(m)) || event(save_message_1_c3(m))).
 query m:bitstring; event(load_message_1_c3(m)) ==> (event(save_message_1_c1(m)) || event(save_message_1_c2(m)) || event(save_message_1_c3(m))).

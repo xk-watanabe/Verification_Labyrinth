@@ -119,7 +119,7 @@ fun convertKey(bitstring): key[typeConverter].
 (* Secrecy *)
 query secret message.
 
-(* Events *)
+(* Integrity *)
 event save_message(bitstring).
 event load_message(bitstring).
 query m:bitstring; event(load_message(m)) ==> event(save_message(m)).
