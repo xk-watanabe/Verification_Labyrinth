@@ -1,0 +1,49 @@
+free c: channel.
+
+type key.
+type nonce.
+
+(* AES-GCM-Extended *)
+fun nonce1(nonce): nonce.
+fun nonce2(nonce): nonce.
+fun hchacha20(nonce, key): key.
+fun senc(key, nonce, bitstring): bitstring.
+fun sdec(key, nonce, bitstring): bitstring.
+fun mac(key, bitstring): bitstring.
+equation forall k:key, n:nonce, m:bitstring; sdec(k,n,senc(k,n,m)) = m.
+equation forall k:key, n:nonce, m:bitstring; senc(k,n,sdec(k,n,m)) = m.
+letfun aeadenc(k:key, n:nonce, aad:bitstring, plaintext:bitstring) =
+    (senc(k,n,plaintext), mac(k,(n,aad,senc(k,n,plaintext)))).
+letfun aeaddec(k:key, n:nonce, aad:bitstring, ciphertext:bitstring, tag:bitstring) =
+    let (=tag) =mac(k,(n,aad,ciphertext)) in
+    let plaintext:bitstring = sdec(k,n,ciphertext) in
+    plaintext.
+letfun encrypt(k:key, n:nonce, aad:bitstring, plaintext:bitstring) =
+    let subkey = hchacha20(nonce1(n),k) in
+    let subnonce = nonce2(n) in
+    (n,aeadenc(subkey,subnonce,aad,plaintext)).
+letfun decrypt(k:key, aad:bitstring, ciphertext:bitstring) =
+    let (n:nonce,(ciphertext':bitstring,tag:bitstring)) = ciphertext in
+    let subkey = hchacha20(nonce1(n),k) in
+    let subnonce = nonce2(n) in
+    aeaddec(subkey,subnonce,aad,ciphertext',tag).
+
+event send(bitstring).
+event receive(bitstring).
+query m:bitstring; event(receive(m)) ==> event(send(m)).
+
+let sender(k:key,aad:bitstring)=
+    new plaintext: bitstring;
+    new n: nonce;
+    event send(plaintext);
+    out(c,encrypt(k,n,aad,plaintext)).
+
+let receiver(k:key,aad:bitstring)=
+    in(c,ciphertext:bitstring);
+    let plaintext' = decrypt(k,aad,ciphertext) in
+    event receive(plaintext').
+
+process
+    new k: key;
+    new aad: bitstring;
+    (!sender(k,aad)|!receiver(k,aad))

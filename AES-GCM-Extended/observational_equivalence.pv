@@ -1,0 +1,53 @@
+free c: channel.
+
+type key.
+type nonce.
+
+(* AES-GCM-Extended *)
+fun nonce1(nonce): nonce.
+fun nonce2(nonce): nonce.
+fun hchacha20(nonce, key): key.
+fun senc(key, nonce, bitstring): bitstring.
+fun sdec(key, nonce, bitstring): bitstring.
+fun mac(key, bitstring): bitstring.
+equation forall k:key, n:nonce, m:bitstring; sdec(k,n,senc(k,n,m)) = m.
+equation forall k:key, n:nonce, m:bitstring; senc(k,n,sdec(k,n,m)) = m.
+letfun aeadenc(k:key, n:nonce, aad:bitstring, plaintext:bitstring) =
+    (senc(k,n,plaintext), mac(k,(n,aad,senc(k,n,plaintext)))).
+letfun aeaddec(k:key, n:nonce, aad:bitstring, ciphertext:bitstring, tag:bitstring) =
+    let (=tag) =mac(k,(n,aad,ciphertext)) in
+    let plaintext:bitstring = sdec(k,n,ciphertext) in
+    plaintext.
+letfun encrypt(k:key, n:nonce, aad:bitstring, plaintext:bitstring) =
+    let subkey = hchacha20(nonce1(n),k) in
+    let subnonce = nonce2(n) in
+    aeadenc(subkey,subnonce,aad,plaintext).
+letfun decrypt(k:key, aad:bitstring, ciphertext:bitstring) =
+    let (n:nonce,(ciphertext':bitstring,tag:bitstring)) = ciphertext in
+    let subkey = hchacha20(nonce1(n),k) in
+    let subnonce = nonce2(n) in
+    aeaddec(subkey,subnonce,aad,ciphertext',tag).
+
+(* Ideal AEAD *)
+fun enc_cipher(key,nonce,bitstring,bitstring): bitstring.
+reduc forall k:key,n:nonce,aad,plaintext:bitstring;
+    dec_cipher(k,n,aad,enc_cipher(k,n,aad,plaintext)) = plaintext.
+fun enc_tag(key,nonce,bitstring,bitstring): bitstring.
+letfun encrypt'(k:key,n:nonce,aad:bitstring,plaintext:bitstring)=
+    (enc_cipher(k,n,aad,plaintext),enc_tag(k,n,aad,plaintext)).
+letfun decrypt'(k:key,n:nonce,aad:bitstring,ciphertext':bitstring)=
+    let (ciphertext:bitstring,tag:bitstring) = ciphertext' in
+    let plaintext' = dec_cipher(k,n,aad,ciphertext) in
+    if tag = enc_tag(k,n,aad,plaintext') then
+    plaintext'.
+
+process
+(!
+    new k: key;
+    new plaintext: bitstring;
+    new aad: bitstring;
+    new n: nonce; out(c,n);
+    let m_a = encrypt(k,n,aad,plaintext) in (* Real *)
+    let m_b = encrypt'(k,n,aad,plaintext) in (* Ideal *)
+    out(c,choice[m_a,m_b])
+)
